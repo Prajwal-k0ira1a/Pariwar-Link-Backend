@@ -22,72 +22,75 @@ const formatPersonResponse = (person) => ({
   updatedAt: person.updatedAt
 });
 
+// Helper to validate person data
+const validatePersonData = (data) => {
+  const errors = [];
+  
+  if (!data.firstName) errors.push('First name is required');
+  if (!data.gender || !['Male', 'Female', 'Other'].includes(data.gender)) {
+    errors.push('Valid gender is required (Male, Female, Other)');
+  }
+  
+  // Validate nested objects if present
+  if (data.parents) {
+    data.parents.forEach((parent, index) => {
+      if (!parent.role || !['Father', 'Mother', 'Guardian', 'Other'].includes(parent.role)) {
+        errors.push(`Parent ${index + 1}: Valid role is required`);
+      }
+    });
+  }
+  
+  return errors;
+};
+
 // Create a new person
 export const createPerson = async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      birthDate,
-      deathDate,
-      gender,
-      biography,
-      photoUrl,
-      grandParents = [],
-      parents = [],
-      children = [],
-      spouse = [],
-      unclesAndAunts = []
-    } = req.body;
+    // Validate required fields
+    const validationErrors = validatePersonData(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationErrors
+      });
+    }
 
-    const person = new Person({
-      firstName,
-      lastName,
-      birthDate,
-      deathDate,
-      gender,
-      biography,
-      photoUrl: photoUrl || '/default-avatar.png',
-      grandParents,
-      parents,
-      children,
-      spouse,
-      unclesAndAunts
-    });
+    // Set default values
+    const personData = {
+      ...req.body,
+      photoUrl: req.body.photoUrl || '/default-avatar.png',
+      // Initialize empty arrays if not provided
+      grandParents: req.body.grandParents || [],
+      parents: req.body.parents || [],
+      children: req.body.children || [],
+      spouse: req.body.spouse || [],
+      unclesAndAunts: req.body.unclesAndAunts || []
+    };
 
+    const person = new Person(personData);
     await person.save();
-    res.status(201).json({ success: true, data: formatPersonResponse(person) });
+    
+    res.status(201).json({ 
+      success: true, 
+      data: formatPersonResponse(person) 
+    });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(400).json({ 
+      success: false, 
+      error: 'Failed to create person',
+      details: error.message 
+    });
   }
 };
 
-// Get all people with pagination and search
+// Get all people
 export const getPeople = async (req, res) => {
   try {
-    const { search, page = 1, limit = 10 } = req.query;
-    const query = {};
-    
-    if (search) {
-      query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { biography: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const people = await Person.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const count = await Person.countDocuments(query);
-
+    const people = await Person.find();
     res.status(200).json({
       success: true,
-      totalPages: Math.ceil(count / limit),
-      currentPage: page,
-      count,
+      count: people.length,
       data: people.map(person => formatPersonResponse(person))
     });
   } catch (error) {
@@ -98,8 +101,11 @@ export const getPeople = async (req, res) => {
 // Get single person by ID
 export const getPerson = async (req, res) => {
   try {
-    const person = await Person.findById(req.params.id);
+    if (!isValidId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid ID' });
+    }
     
+    const person = await Person.findById(req.params.id);
     if (!person) {
       return res.status(404).json({ 
         success: false, 
@@ -119,24 +125,34 @@ export const getPerson = async (req, res) => {
 // Update a person
 export const updatePerson = async (req, res) => {
   try {
-    const updates = Object.keys(req.body);
-    const allowedUpdates = [
-      'firstName', 'lastName', 'birthDate', 'deathDate', 
-      'gender', 'biography', 'photoUrl', 'grandParents', 
-      'parents', 'children', 'spouse', 'unclesAndAunts'
-    ];
-    const isValidOperation = updates.every(update => 
-      allowedUpdates.includes(update)
-    );
-
-    if (!isValidOperation) {
+    const { id } = req.params;
+    
+    if (!isValidId(id)) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Invalid updates!' 
+        error: 'Invalid ID' 
       });
     }
 
-    const person = await Person.findById(req.params.id);
+    // Validate the update data
+    if (req.body.gender && !['Male', 'Female', 'Other'].includes(req.body.gender)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid gender value. Must be one of: Male, Female, Other'
+      });
+    }
+
+    // Prevent updating protected fields
+    const updateData = { ...req.body };
+    delete updateData._id; // Prevent ID changes
+    delete updateData.createdAt; // Prevent modification of creation date
+    delete updateData.updatedAt; // This will be set automatically
+
+    const person = await Person.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
     
     if (!person) {
       return res.status(404).json({ 
@@ -144,23 +160,34 @@ export const updatePerson = async (req, res) => {
         error: 'Person not found' 
       });
     }
-
-    updates.forEach(update => person[update] = req.body[update]);
-    await person.save();
 
     res.status(200).json({ 
       success: true, 
       data: formatPersonResponse(person) 
     });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(400).json({ 
+      success: false, 
+      error: 'Failed to update person',
+      details: error.message 
+    });
   }
 };
 
 // Delete a person
 export const deletePerson = async (req, res) => {
   try {
-    const person = await Person.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    
+    if (!isValidId(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid ID' 
+      });
+    }
+
+    // First delete the person
+    const person = await Person.findByIdAndDelete(id);
     
     if (!person) {
       return res.status(404).json({ 
@@ -169,99 +196,18 @@ export const deletePerson = async (req, res) => {
       });
     }
 
+    // If you have a removePersonReferences function, you would call it here
+    // await removePersonReferences(id);
+
     res.status(200).json({ 
       success: true, 
+      message: 'Person deleted successfully',
       data: {}
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Add family relationship
-export const addFamilyMember = async (req, res) => {
-  try {
-    const { personId } = req.params;
-    const { relationship, memberData } = req.body;
-    
-    const validRelationships = [
-      'grandParents', 'parents', 'children', 'spouse', 'unclesAndAunts'
-    ];
-
-    if (!validRelationships.includes(relationship)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid relationship type'
-      });
-    }
-
-    const person = await Person.findById(personId);
-    if (!person) {
-      return res.status(404).json({
-        success: false,
-        error: 'Person not found'
-      });
-    }
-
-    person[relationship].push(memberData);
-    await person.save();
-
-    res.status(200).json({
-      success: true,
-      data: formatPersonResponse(person)
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
     });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Remove family relationship
-export const removeFamilyMember = async (req, res) => {
-  try {
-    const { personId, memberId } = req.params;
-    const { relationship } = req.body;
-    
-    const validRelationships = [
-      'grandParents', 'parents', 'children', 'spouse', 'unclesAndAunts'
-    ];
-
-    if (!validRelationships.includes(relationship)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid relationship type'
-      });
-    }
-
-    const person = await Person.findById(personId);
-    if (!person) {
-      return res.status(404).json({
-        success: false,
-        error: 'Person not found'
-      });
-    }
-
-    person[relationship] = person[relationship].filter(
-      member => member._id.toString() !== memberId
-    );
-    
-    await person.save();
-
-    res.status(200).json({
-      success: true,
-      data: formatPersonResponse(person)
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-    await removePersonReferences(id);
-
-    const deleted = await Person.findByIdAndDelete(id);
-    if (!deleted)
-      return res.status(404).json({ status: false, message: "Not found" });
-
-    res.json({ status: true, message: "Deleted" });
-  } catch (err) {
-    res.status(500).json({ status: false, message: err.message });
   }
 };
