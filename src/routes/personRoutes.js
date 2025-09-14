@@ -1,27 +1,26 @@
-import { Router } from "express";
+import express from "express";
 import {
   createPerson,
-  getPeople,
-  getPerson,
+  getAllPeople,
+  getPersonById,
   updatePerson,
-  deletePerson
+  deletePerson,
 } from "../controllers/personController.js";
+import {
+  addOrUpdateRelation,
+  getPersonWithRelations,
+} from "../controllers/FamilyController.js";
 
-const router = Router();
+const router = express.Router();
 
-// Get all people
-router.get("/", getPeople);
-
-// Get a single person by ID
-router.get("/:id", getPerson);
-
-// Create a new person
 router.post("/", createPerson);
-
-// Update a person
-router.patch("/:id", updatePerson);
-
-// Delete a person
+router.get("/", getAllPeople);
+router.get("/:id", getPersonById);
+router.put("/:id", updatePerson);
 router.delete("/:id", deletePerson);
+
+// Family relations
+router.post("/relations", addOrUpdateRelation);
+router.get("/relations/:id", getPersonWithRelations);
 
 export default router;

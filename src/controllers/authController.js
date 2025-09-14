@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
-
+import Person from "../models/Person.js";
 // Generate JWT
 const generateToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -55,9 +55,12 @@ export const loginUser = async (req, res) => {
     if(!user||!password){
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    
+  
     res.status(200).json({
       status: true,
+      message: "Login successful",
+      person,
+      user,
       _id: user._id,
       name: user.name,
       email: user.email,
