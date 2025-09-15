@@ -26,7 +26,7 @@ export const registerUser = async (req, res) => {
       lastName,
       email,
       password: hashedPassword,
-      role: role || 'user',
+      role: role || "user",
     });
 
     res.status(201).json({
@@ -51,8 +51,9 @@ export const loginUser = async (req, res) => {
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
-    
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
+
     res.status(200).json({
       _id: user._id,
       firstName: user.firstName,
@@ -69,10 +70,12 @@ export const loginUser = async (req, res) => {
 // Get all users (Admin only)
 export const getUsers = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to access this route' });
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to access this route" });
     }
-    const users = await User.find().select('-password');
+    const users = await User.find().select("-password");
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -82,15 +85,17 @@ export const getUsers = async (req, res) => {
 // Get single user
 export const getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
-    
+    const user = await User.findById(req.params.id).select("-password");
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Only allow admins or the user themselves to access the profile
-    if (req.user.role !== 'admin' && req.user.id !== user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to access this user' });
+    if (req.user.role !== "admin" && req.user.id !== user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to access this user" });
     }
 
     res.status(200).json(user);
@@ -102,7 +107,7 @@ export const getUser = async (req, res) => {
 // Get current user profile
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id).select("-password");
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -116,19 +121,21 @@ export const updateUser = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Only allow admins or the user themselves to update the profile
-    if (req.user.role !== 'admin' && req.user.id !== user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to update this user' });
+    if (req.user.role !== "admin" && req.user.id !== user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update this user" });
     }
 
     // Update fields if they exist in the request
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
     if (email) user.email = email;
-    
+
     // Handle password update
     if (password) {
       const salt = await bcrypt.genSalt(10);
@@ -136,14 +143,14 @@ export const updateUser = async (req, res) => {
     }
 
     const updatedUser = await user.save();
-    
+
     res.status(200).json({
       _id: updatedUser._id,
       firstName: updatedUser.firstName,
       lastName: updatedUser.lastName,
       email: updatedUser.email,
       role: updatedUser.role,
-      token: generateToken(updatedUser)
+      token: generateToken(updatedUser),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -156,17 +163,19 @@ export const deleteUser = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Only allow admins to delete users
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to delete users' });
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete users" });
     }
 
     await User.deleteOne({ _id: user._id });
-    
-    res.status(200).json({ message: 'User removed' });
+
+    res.status(200).json({ message: "User removed" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

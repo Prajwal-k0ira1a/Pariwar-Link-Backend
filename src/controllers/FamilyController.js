@@ -1,23 +1,26 @@
 import { FamilyRelation } from "../models/FamilyRelationSchema.js";
 import Person from "../models/Person.js";
+import { checkPersonOwnership } from "../middleware/ownershipMiddleware.js";
 
 // Add a new family relationship
 export const addRelation = async (req, res) => {
   const { person, relation_type, related_person } = req.body;
+  const userId = req.user._id;
 
   try {
-    // Check if both persons exist
-    const [personExists, relatedPersonExists] = await Promise.all([
-      Person.findById(person),
-      Person.findById(related_person)
+    // Check if the person and related person belong to the current user
+    const [personValid, relatedPersonValid] = await Promise.all([
+      checkPersonOwnership(person, userId),
+      checkPersonOwnership(related_person, userId)
     ]);
 
-    if (!personExists || !relatedPersonExists) {
-      return res.status(404).json({ message: "Person or related person not found" });
+    if (!personValid || !relatedPersonValid) {
+      return res.status(403).json({ message: "Not authorized to create this relationship" });
     }
 
     // Check if the relation already exists
     const existingRelation = await FamilyRelation.findOne({
+      user: userId,
       person,
       related_person,
       relation_type
@@ -29,28 +32,28 @@ export const addRelation = async (req, res) => {
 
     // Create the relationship
     const relation = await FamilyRelation.create({
+      user: userId,
       person,
       relation_type,
       related_person
     });
 
-    // If this is a two-way relationship (like parent-child), create the inverse
-    if (relation_type === 'father' || relation_type === 'mother') {
+    // If this is a two-way relationship, create the inverse
+    if (['father', 'mother', 'spouse', 'sibling', 'child'].includes(relation_type)) {
+      let inverseType = relation_type;
+      
+      // Define inverse relationships
+      if (relation_type === 'father' || relation_type === 'mother') {
+        inverseType = 'child';
+      } else if (relation_type === 'child') {
+        inverseType = (await Person.findById(related_person)).gender === 'Male' ? 'father' : 'mother';
+      }
+      // For spouse and sibling, the inverse is the same
+
       await FamilyRelation.create({
+        user: userId,
         person: related_person,
-        relation_type: 'child',
-        related_person: person
-      });
-    } else if (relation_type === 'spouse') {
-      await FamilyRelation.create({
-        person: related_person,
-        relation_type: 'spouse',
-        related_person: person
-      });
-    } else if (relation_type === 'sibling') {
-      await FamilyRelation.create({
-        person: related_person,
-        relation_type: 'sibling',
+        relation_type: inverseType,
         related_person: person
       });
     }
@@ -65,16 +68,24 @@ export const addRelation = async (req, res) => {
 export const getPersonRelations = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id;
+
+    // Verify the person belongs to the user
+    const personBelongsToUser = await checkPersonBelongsToUser(id, userId);
+    if (!personBelongsToUser) {
+      return res.status(403).json({ message: "Not authorized to view these relationships" });
+    }
     
     // Get all relationships where this person is involved
     const relationships = await FamilyRelation.find({
+      user: userId,
       $or: [
         { person: id },
         { related_person: id }
       ]
     })
-    .populate('person', 'firstName lastName photoUrl')
-    .populate('related_person', 'firstName lastName photoUrl');
+    .populate('person', 'firstName lastName photoUrl gender')
+    .populate('related_person', 'firstName lastName photoUrl gender');
 
     if (!relationships || relationships.length === 0) {
       return res.status(404).json({ message: "No relationships found for this person" });
@@ -92,7 +103,7 @@ export const getPersonRelations = async (req, res) => {
         if (relationType === 'father' || relationType === 'mother') {
           relationType = 'child';
         } else if (relationType === 'child') {
-          relationType = rel.related_person.gender === 'Male' ? 'father' : 'mother';
+          relationType = relatedPerson.gender === 'Male' ? 'father' : 'mother';
         }
       }
 
@@ -121,24 +132,35 @@ export const getPersonRelations = async (req, res) => {
 export const removeRelation = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id;
     
-    // Find the relationship to get details before deleting
-    const relation = await FamilyRelation.findById(id);
+    // Find the relationship to verify ownership
+    const relation = await FamilyRelation.findOne({
+      _id: id,
+      user: userId
+    });
+    
     if (!relation) {
-      return res.status(404).json({ message: "Relationship not found" });
+      return res.status(404).json({ message: "Relationship not found or access denied" });
     }
 
     // Delete the relationship
     await FamilyRelation.findByIdAndDelete(id);
 
     // If this was a two-way relationship, remove the inverse as well
-    if (['father', 'mother', 'spouse', 'sibling'].includes(relation.relation_type)) {
+    if (['father', 'mother', 'spouse', 'sibling', 'child'].includes(relation.relation_type)) {
       let inverseType = relation.relation_type;
+      
       if (inverseType === 'father' || inverseType === 'mother') {
         inverseType = 'child';
+      } else if (inverseType === 'child') {
+        const relatedPerson = await Person.findById(relation.related_person);
+        inverseType = relatedPerson.gender === 'Male' ? 'father' : 'mother';
       }
+      // For spouse and sibling, the inverse is the same
       
       await FamilyRelation.findOneAndDelete({
+        user: userId,
         person: relation.related_person,
         related_person: relation.person,
         relation_type: inverseType

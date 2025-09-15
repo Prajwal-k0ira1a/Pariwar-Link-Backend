@@ -1,8 +1,13 @@
 import mongoose from "mongoose";
-const { Schema } = mongoose;
 
-const PersonSchema = new Schema(
+const PersonSchema = new mongoose.Schema(
   {
+    // Reference to the user who owns this person record
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     // Basic personal info
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
@@ -20,6 +25,7 @@ const PersonSchema = new Schema(
   { timestamps: true }
 );
 
+// Index for faster user-based queries
+PersonSchema.index({ user: 1 });
+
 export default mongoose.model("Person", PersonSchema);
-    
- 
