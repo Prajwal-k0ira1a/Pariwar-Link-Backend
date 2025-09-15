@@ -7,20 +7,23 @@ import {
   deletePerson,
 } from "../controllers/personController.js";
 import {
-  addOrUpdateRelation,
-  getPersonWithRelations,
+  addRelation,
+  getPersonRelations,
+  removeRelation
 } from "../controllers/FamilyController.js";
 
 const router = express.Router();
 
-router.post("/", createPerson);
-router.get("/", getAllPeople);
-router.get("/:id", getPersonById);
-router.put("/:id", updatePerson);
-router.delete("/:id", deletePerson);
+// Person CRUD routes
+router.post("create/", createPerson);
+router.get("get/", getAllPeople);
+router.get("get/:id", getPersonById);
+router.put("update/:id", updatePerson);
+router.delete("delete/:id", deletePerson);
 
-// Family relations
-router.post("/relations", addOrUpdateRelation);
-router.get("/relations/:id", getPersonWithRelations);
+// Family relation routes
+router.post("add/:id/relations", addRelation);
+router.get("getRelations/:id/relations", getPersonRelations);
+router.delete("remove/relations/:id", removeRelation);
 
 export default router;

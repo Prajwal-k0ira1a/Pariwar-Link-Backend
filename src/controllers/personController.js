@@ -40,8 +40,9 @@ export const updatePerson = async (req, res) => {
     const person = await Person.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
+    const parents= await Person.find({ _id: { $in: person.parents } });
     if (!person) return res.status(404).json({ message: "Person not found" });
-    res.json(person);
+    res.json(person,parents);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

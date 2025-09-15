@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 const { Schema } = mongoose;
 
 const PersonSchema = new Schema(
-  {// link to User
+  {
+    // Basic personal info
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     birthDate: Date,
@@ -20,3 +21,5 @@ const PersonSchema = new Schema(
 );
 
 export default mongoose.model("Person", PersonSchema);
+    
+ 
