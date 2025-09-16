@@ -3,15 +3,15 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema({
   firstName: { 
     type: String, 
-    required: [true, 'First name is required'] 
+    required: true, 
   },
   lastName: { 
     type: String, 
-    required: [true, 'Last name is required'] 
+    required: true, 
   },
   email: { 
     type: String, 
-    required: [true, 'Email is required'], 
+    required: true,  
     unique: true,
     trim: true,
     lowercase: true,
@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   },
   password: { 
     type: String, 
-    required: [true, 'Password is required'],
+    required: true,
     minlength: [6, 'Password must be at least 6 characters long']
   },
   role: { 
@@ -36,15 +36,7 @@ const userSchema = new mongoose.Schema({
   }]
 }, { 
   timestamps: true,
-  toJSON: {
-    transform: function(doc, ret) {
-      ret.id = ret._id;
-      delete ret._id;
-      delete ret.__v;
-      delete ret.password;
-      return ret;
-    }
-  }
+ 
 });
 
 // Index for faster queries

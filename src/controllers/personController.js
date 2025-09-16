@@ -57,22 +57,29 @@ export const updatePerson = async (req, res) => {
   }
 };
 
-// Delete a person and their relationships
 export const deletePerson = async (req, res) => {
+  const session = await Person.startSession();
+  session.startTransaction();
+  
   try {
-    // The person is already attached to req by the checkPersonOwnership middleware
-    await Person.findByIdAndDelete(req.person._id);
-    
-    // Delete all relationships involving this person
+    // Delete all relationships involving this person first
     await FamilyRelation.deleteMany({
       $or: [
         { person: req.person._id },
-        { related_person: req.person._id }
+        { relatedPerson: req.person._id } // <-- fixed field name
       ]
-    });
+    }).session(session);
     
+    // Then delete the person
+    await Person.findByIdAndDelete(req.person._id).session(session);
+    
+    await session.commitTransaction();
+    session.endSession();
+
     res.json({ message: "Person and their relationships deleted successfully" });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     res.status(500).json({ error: err.message });
   }
 };

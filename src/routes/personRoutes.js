@@ -20,15 +20,17 @@ const router = express.Router();
 router.use(protect);
 
 // Person CRUD routes
-router.post("/", createPerson);
-router.get("/", getAllPeople);
-router.get("/:id", checkPersonOwnership, getPersonById);
-router.put("/:id", checkPersonOwnership, updatePerson);
-router.delete("/:id", checkPersonOwnership, deletePerson);
+router.post("/create", createPerson);
+router.get("/all", getAllPeople);
+
+// Routes that need person ownership check
+router.get("/get/:personId", checkPersonOwnership, getPersonById);
+router.put("/update/:personId", checkPersonOwnership, updatePerson);
+router.delete("/delete/:personId", checkPersonOwnership, deletePerson);
 
 // Family relation routes
-router.post("/:id/relations", checkPersonOwnership, addRelation);
-router.get("/:id/relations", checkPersonOwnership, getPersonRelations);
-router.delete("/relations/:id", checkRelationOwnership, removeRelation);
+router.post("/:personId/relations", checkPersonOwnership, addRelation);
+router.get("/:personId/relations", checkPersonOwnership, getPersonRelations);
+router.delete("/relations/:relationId", checkRelationOwnership, removeRelation);
 
 export default router;

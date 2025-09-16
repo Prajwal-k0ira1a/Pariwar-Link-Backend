@@ -10,6 +10,6 @@ router.use("/auth", authRoute);
 
 // Protected routes (require authentication)
 router.use("/users", userRoutes);
-router.use("/people", personRoutes);
+router.use("/person", personRoutes);
 
 export default router;

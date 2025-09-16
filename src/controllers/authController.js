@@ -12,7 +12,7 @@ const generateToken = (user) => {
 // Register
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { firstName, lastName, email, password, role } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
@@ -22,7 +22,8 @@ export const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const user = await User.create({
-      name,
+      firstName,
+      lastName,
       email,
       password: hashedPassword,
       role,
@@ -30,7 +31,8 @@ export const registerUser = async (req, res) => {
 
     res.status(201).json({
       _id: user._id,
-      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
       role: user.role,
       token: generateToken(user),
@@ -44,25 +46,39 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
+    console.log("Request body:", req.body);
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
-    
-    if(!user||!password){
+
+    if (!user || !password) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-  
+    const token = generateToken(user);
+    
+    // Set HTTP-only cookie with secure settings
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      path: '/',
+      // Remove domain for localhost
+      // domain: 'localhost' // Commented out for local development
+    });
+    
+    console.log('Cookie set successfully'); // Debug log
+    
     res.status(200).json({
       status: true,
       message: "Login successful",
-      person,
       user,
       _id: user._id,
-      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
       role: user.role,
       token: generateToken(user),
